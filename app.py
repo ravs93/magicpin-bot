@@ -70,20 +70,11 @@ def receive_context(data: dict):
 @app.post("/v1/reply")
 def reply(data: dict):
 
-    trigger_id = data.get("trigger_id")
-
-    trigger = trigger_contexts.get(trigger_id)
-
-    if not trigger:
-        return {
-            "message": "Trigger not found"
-        }
-
     return {
-            "action": "send",
-            "body": "Thanks for your response. How can I help further?",
-            "cta": "open_ended",
-            "rationale": "Basic reply handler"
+        "action": "send",
+        "body": "Thanks for your response. I can help with the next step. Would you like me to continue?",
+        "cta": "open_ended",
+        "rationale": "Basic reply handler for merchant/customer responses"
     }
 
 @app.post("/v1/tick")
