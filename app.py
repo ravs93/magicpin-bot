@@ -14,6 +14,7 @@ contexts_loaded = {
     "customer": 0,
     "trigger": 0
 }
+conversations = {}
 
 @app.get("/")
 def home():
@@ -92,6 +93,12 @@ def receive_context(data: dict):
 
 @app.post("/v1/reply")
 def reply(data: dict):
+    conversation_id = data.get("conversation_id")
+
+    if conversation_id not in conversations:
+        conversations[conversation_id] = []
+        
+    conversations[conversation_id].append(data.get("message", ""))
 
     message = data.get("message", "").lower()
 
