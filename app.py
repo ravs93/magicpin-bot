@@ -33,7 +33,7 @@ def metadata():
     return {
         "team_name": "Ravinder Singh",
         "team_members": ["Ravinder Singh"],
-        "model": "gpt-4o",
+        "model": "rule-based + contextual composer",
         "approach": "context storage + trigger based message generation",
         "contact_email": "rs536091@gmail.com",
         "version": "1.0.0"
@@ -97,7 +97,7 @@ def reply(data: dict):
 
     if conversation_id not in conversations:
         conversations[conversation_id] = []
-        
+
     conversations[conversation_id].append(data.get("message", ""))
 
     message = data.get("message", "").lower()
