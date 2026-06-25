@@ -43,28 +43,51 @@ def receive_context(data: dict):
 
     scope = data.get("scope")
     context_id = data.get("context_id")
+    version = data.get("version", 1)
     payload = data.get("payload", {})
 
-    if scope == "category":
-        category_contexts[context_id] = payload
-        contexts_loaded["category"] += 1
+    if scope not in ["category", "merchant", "customer", "trigger"]:
+        return {
+            "accepted": False,
+            "reason": "invalid_scope",
+            "details": f"Unknown scope: {scope}"
+        }
 
-    elif scope == "merchant":
-        merchant_contexts[context_id] = payload
-        contexts_loaded["merchant"] += 1
+    if not context_id:
+        return {
+            "accepted": False,
+            "reason": "missing_context_id"
+        }
 
-    elif scope == "customer":
-        customer_contexts[context_id] = payload
-        contexts_loaded["customer"] += 1
+    store_map = {
+        "category": category_contexts,
+        "merchant": merchant_contexts,
+        "customer": customer_contexts,
+        "trigger": trigger_contexts
+    }
 
-    elif scope == "trigger":
-        trigger_contexts[context_id] = payload
-        contexts_loaded["trigger"] += 1
+    store = store_map[scope]
+    existing = store.get(context_id)
+
+    if existing and existing.get("_version", 0) > version:
+        return {
+            "accepted": False,
+            "reason": "stale_version",
+            "current_version": existing.get("_version", 0)
+        }
+
+    is_new = context_id not in store
+
+    payload["_version"] = version
+    store[context_id] = payload
+
+    if is_new:
+        contexts_loaded[scope] += 1
 
     return {
         "accepted": True,
-        "ack_id": f"ack_{context_id}",
-        "stored_at": datetime.utcnow().isoformat()
+        "ack_id": f"ack_{context_id}_v{version}",
+        "stored_at": datetime.utcnow().isoformat() + "Z"
     }
 
 @app.post("/v1/reply")
