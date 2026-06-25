@@ -142,6 +142,7 @@ def tick(data: dict):
         merchant = merchant_contexts.get(merchant_id, {})
         identity = merchant.get("identity", {})
         merchant_name = identity.get("name", "there")
+        category = merchant.get("category_slug", "")
         city = identity.get("city", "")
         locality = identity.get("locality", "")
 
@@ -178,7 +179,42 @@ def tick(data: dict):
             body = f"Hi {merchant_name}, an upcoming festival is a good opportunity to promote your business. Want campaign ideas?"
 
         else:
-            body = f"Hi {merchant_name}, I noticed a {kind} update for your business. Would you like me to help with the next step?"
+
+            if category == "dentists":
+                body = (
+                    f"Hi Dr. {merchant_name}, I found an update that may help improve patient engagement. "
+                    "Would you like me to suggest a patient communication?"
+                )
+
+            elif category == "gyms":
+                body = (
+                    f"Hi {merchant_name}, I noticed an opportunity to attract more gym members. "
+                    "Would you like some campaign ideas?"
+                )
+
+            elif category == "restaurants":
+                body = (
+                    f"Hi {merchant_name}, I found a marketing opportunity that could increase customer visits. "
+                    "Would you like to see it?"
+                )
+
+            elif category == "salons":
+                body = (
+                    f"Hi {merchant_name}, I have a few ideas that could help bring more salon appointments this week. "
+                    "Interested?"
+                )
+
+            elif category == "pharmacies":
+                body = (
+                    f"Hi {merchant_name}, I noticed an opportunity to improve customer engagement for your pharmacy. "
+                    "Would you like some suggestions?"
+                )
+
+            else:
+                body = (
+                    f"Hi {merchant_name}, I noticed a {kind} update for your business. "
+                    "Would you like me to help with the next step?"
+                )
 
         actions.append({
             "conversation_id": f"conv_{merchant_id}_{trigger_id}",
