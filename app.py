@@ -120,7 +120,23 @@ def tick(data: dict):
         identity = merchant.get("identity", {})
         merchant_name = identity.get("name", "there")
 
-        body = f"Hi {merchant_name}, I noticed a {kind} update for your business. Would you like me to help with the next step?"
+        if kind == "research_digest":
+            body = f"Hi {merchant_name}, there's new research relevant to your business. Would you like a quick summary?"
+
+        elif kind == "perf_spike":
+            body = f"Great news {merchant_name}! Your business performance has improved recently. Would you like to see what's driving it?"
+
+        elif kind == "perf_dip":
+            body = f"Hi {merchant_name}, I noticed a drop in your recent performance. I have a few suggestions that may help."
+
+        elif kind == "recall_due":
+            body = f"Hi {merchant_name}, one of your customers is due for a follow-up. Shall I prepare a reminder?"
+
+        elif kind == "festival_upcoming":
+            body = f"Hi {merchant_name}, an upcoming festival is a good opportunity to promote your business. Want campaign ideas?"
+
+        else:
+            body = f"Hi {merchant_name}, I noticed a {kind} update for your business. Would you like me to help with the next step?"
 
         actions.append({
             "conversation_id": f"conv_{merchant_id}_{trigger_id}",
