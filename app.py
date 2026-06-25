@@ -80,12 +80,15 @@ def reply(data: dict):
         }
 
     return {
-        "message": f"Generated response for {trigger_id}"
+            "action": "send",
+            "body": "Thanks for your response. How can I help further?",
+            "cta": "open_ended",
+            "rationale": "Basic reply handler"
     }
 
 @app.post("/v1/tick")
-def tick():
+def tick(data: dict):
 
     return {
-        "messages": []
+        "actions": []
     }
