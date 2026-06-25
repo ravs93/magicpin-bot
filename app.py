@@ -119,6 +119,16 @@ def tick(data: dict):
         merchant = merchant_contexts.get(merchant_id, {})
         identity = merchant.get("identity", {})
         merchant_name = identity.get("name", "there")
+        city = identity.get("city", "")
+        locality = identity.get("locality", "")
+
+        performance = merchant.get("performance", {})
+        offers = merchant.get("offers", [])
+
+        offer_title = "your current offer"
+
+        if offers:
+            offer_title = offers[0].get("title", "your current offer")
 
         if kind == "research_digest":
             body = f"Hi {merchant_name}, there's new research relevant to your business. Would you like a quick summary?"
@@ -127,7 +137,16 @@ def tick(data: dict):
             body = f"Great news {merchant_name}! Your business performance has improved recently. Would you like to see what's driving it?"
 
         elif kind == "perf_dip":
-            body = f"Hi {merchant_name}, I noticed a drop in your recent performance. I have a few suggestions that may help."
+            
+            metric = trigger.get("payload", {}).get("metric", "performance")
+            delta = trigger.get("payload", {}).get("delta_pct", 0)
+
+            body = (
+                f"Hi {merchant_name}, I noticed your {metric} dropped by "
+                f"{abs(int(delta * 100))}% over the last week. "
+                f"Your offer '{offer_title}' could help bring more customers. "
+                f"Would you like a few suggestions?"
+            )
 
         elif kind == "recall_due":
             body = f"Hi {merchant_name}, one of your customers is due for a follow-up. Shall I prepare a reminder?"
