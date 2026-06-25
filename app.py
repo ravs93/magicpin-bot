@@ -93,11 +93,34 @@ def receive_context(data: dict):
 @app.post("/v1/reply")
 def reply(data: dict):
 
-    return {
+    message = data.get("message", "").lower()
+
+    if any(word in message for word in ["yes", "go ahead", "interested", "ok", "okay"]):
+        return {
         "action": "send",
-        "body": "Thanks for your response. I can help with the next step. Would you like me to continue?",
+        "body": "Great! I'll prepare the next steps and guide you through the process.",
         "cta": "open_ended",
-        "rationale": "Basic reply handler for merchant/customer responses"
+        "rationale": "Merchant accepted the suggestion."
+    }
+
+    elif any(word in message for word in ["no", "not interested", "stop"]):
+        return {
+        "action": "end",
+        "rationale": "Merchant declined further engagement."
+    }
+
+    elif "thank you for contacting" in message:
+        return {
+        "action": "end",
+        "rationale": "Detected WhatsApp auto-reply."
+    }
+
+    else:
+        return {
+        "action": "send",
+        "body": "Thanks for your response. Could you tell me a little more so I can help you better?",
+        "cta": "open_ended",
+        "rationale": "Continuing the conversation."
     }
 
 @app.post("/v1/tick")
