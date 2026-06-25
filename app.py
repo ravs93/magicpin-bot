@@ -103,6 +103,39 @@ def reply(data: dict):
 @app.post("/v1/tick")
 def tick(data: dict):
 
+    available_triggers = data.get("available_triggers", [])
+    actions = []
+
+    for trigger_id in available_triggers:
+        trigger = trigger_contexts.get(trigger_id)
+
+        if not trigger:
+            continue
+
+        merchant_id = trigger.get("merchant_id")
+        customer_id = trigger.get("customer_id")
+        kind = trigger.get("kind", "update")
+
+        merchant = merchant_contexts.get(merchant_id, {})
+        identity = merchant.get("identity", {})
+        merchant_name = identity.get("name", "there")
+
+        body = f"Hi {merchant_name}, I noticed a {kind} update for your business. Would you like me to help with the next step?"
+
+        actions.append({
+            "conversation_id": f"conv_{merchant_id}_{trigger_id}",
+            "merchant_id": merchant_id,
+            "customer_id": customer_id,
+            "send_as": "vera",
+            "trigger_id": trigger_id,
+            "template_name": "vera_basic_update_v1",
+            "template_params": [merchant_name, kind],
+            "body": body,
+            "cta": "open_ended",
+            "suppression_key": trigger.get("suppression_key", trigger_id),
+            "rationale": f"Generated from trigger kind {kind} for merchant {merchant_id}"
+        })
+
     return {
-        "actions": []
+        "actions": actions
     }
