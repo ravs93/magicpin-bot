@@ -30,11 +30,11 @@ def healthz():
 @app.get("/v1/metadata")
 def metadata():
     return {
-        "team_name": "Your Name",
-        "team_members": ["Your Name"],
+        "team_name": "Ravinder Singh",
+        "team_members": ["Ravinder Singh"],
         "model": "gpt-4o",
         "approach": "context storage + trigger based message generation",
-        "contact_email": "your-email@example.com",
+        "contact_email": "rs536091@gmail.com",
         "version": "1.0.0"
     }
 
