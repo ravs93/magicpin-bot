@@ -191,18 +191,32 @@ def tick(data: dict):
             body = f"Great news {merchant_name}! Your business performance has improved recently. Would you like to see what's driving it?"
 
         elif kind == "perf_dip":
-            
-            metric = trigger.get("payload", {}).get("metric", "performance")
-            delta = trigger.get("payload", {}).get("delta_pct", 0)
+
+            payload = trigger.get("payload", {})
+
+            metric = payload.get("metric", "performance")
+            delta = abs(int(payload.get("delta_pct", 0) * 100))
+
+            signals = merchant.get("signals", [])
+            review_themes = merchant.get("review_themes", [])
+
+            suggestion = f"promoting '{offer_title}'"
+
+            if "no_recent_post" in signals or any("stale_posts" in s for s in signals):
+                suggestion = "posting fresh updates about your business"
+
+            elif "no_active_offers" in signals:
+                suggestion = "creating a new customer offer"
+
+            elif review_themes:
+                theme = review_themes[0].get("theme", "customer experience").replace("_", " ")
+                suggestion = f"highlighting your positive {theme} reviews"
 
             body = (
-                f"Hi {merchant_name}, I noticed your {metric} dropped by "
-                f"{abs(int(delta * 100))}% over the last week. "
-                f"Your offer '{offer_title}' could help bring more customers. "
-                f"Would you like a few suggestions?"
+                f"Hi {merchant_name}, I noticed your {metric} has dropped by {delta}% over the last 7 days. "
+                f"One opportunity I noticed is {suggestion}. "
+                f"Would you like me to prepare a personalised recommendation to help recover your {metric}?"
             )
-
-        elif kind == "recall_due":
             body = f"Hi {merchant_name}, one of your customers is due for a follow-up. Shall I prepare a reminder?"
 
         elif kind == "festival_upcoming":
