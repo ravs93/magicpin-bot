@@ -150,6 +150,7 @@ def tick(data: dict):
         identity = merchant.get("identity", {})
         merchant_name = identity.get("name", "there")
         category = merchant.get("category_slug", "")
+        category_context = category_contexts.get(category, {})
         city = identity.get("city", "")
         locality = identity.get("locality", "")
 
@@ -163,66 +164,95 @@ def tick(data: dict):
 
         if kind == "research_digest":
 
-            signals = merchant.get("signals", [])
-            peer = "your business"
+            payload = trigger.get("payload", {})
+            digest_items = category_context.get("digest", [])
+            top_item_id = payload.get("top_item_id")
 
-            if category == "dentists":
-                peer = "your patients"
+            digest_item = None
+
+            for item in digest_items:
+                if item.get("id") == top_item_id:
+                    digest_item = item
+                    break
+
+            if not digest_item and digest_items:
+                digest_item = digest_items[0]
+
+            title = digest_item.get("title", "a new industry update") if digest_item else "a new industry update"
+            source = digest_item.get("source", "") if digest_item else ""
+
+            customer_aggregate = merchant.get("customer_aggregate", {})
+            high_risk_count = customer_aggregate.get("high_risk_adult_count")
+
+            relevance = "your business"
+            if category == "dentists" and high_risk_count:
+                relevance = f"your {high_risk_count} high-risk adult patients"
             elif category == "gyms":
-                peer = "your members"
+                relevance = "your members"
             elif category == "restaurants":
-                peer = "your customers"
+                relevance = "your customers"
             elif category == "salons":
-                peer = "your clients"
+                relevance = "your clients"
             elif category == "pharmacies":
-                peer = "your regular customers"
+                relevance = "your repeat customers"
 
-            signal_text = ""
-
-            if signals:
-                signal_text = f" I also noticed {signals[0].replace('_', ' ')}."
+            source_text = f" — {source}" if source else ""
 
             body = (
-                f"Hi {merchant_name}, I found a new {category} industry update that could be relevant for {peer}."
-                f"{signal_text} Would you like a quick summary and a suggestion on how you could use it for your business?"
+                f"Hi {merchant_name}, I found this update relevant for {relevance}: "
+                f"{title}{source_text}. "
+                f"Would you like me to summarize it and draft a WhatsApp message you can use?"
             )
 
         elif kind == "perf_spike":
-            body = f"Great news {merchant_name}! Your business performance has improved recently. Would you like to see what's driving it?"
-
-        elif kind == "perf_dip":
 
             payload = trigger.get("payload", {})
-
             metric = payload.get("metric", "performance")
-            delta = abs(int(payload.get("delta_pct", 0) * 100))
+            delta = abs(int(payload.get("delta_pct", 0) * 100)) if payload.get("delta_pct") else None
 
-            signals = merchant.get("signals", [])
-            review_themes = merchant.get("review_themes", [])
+            peer_stats = category_context.get("peer_stats", {})
+            avg_ctr = peer_stats.get("avg_ctr")
+            ctr = performance.get("ctr")
 
-            suggestion = f"promoting '{offer_title}'"
+            active_offer = offer_title
+            if not offers:
+                catalog = category_context.get("offer_catalog", [])
+                if catalog:
+                    active_offer = catalog[0].get("title", "a category-relevant offer")
 
-            if "no_recent_post" in signals or any("stale_posts" in s for s in signals):
-                suggestion = "posting fresh updates about your business"
+            delta_text = f" by {delta}%" if delta else ""
+            peer_text = ""
 
-            elif "no_active_offers" in signals:
-                suggestion = "creating a new customer offer"
-
-            elif review_themes:
-                theme = review_themes[0].get("theme", "customer experience").replace("_", " ")
-                suggestion = f"highlighting your positive {theme} reviews"
+            if ctr and avg_ctr:
+                peer_text = f" Your CTR is {round(ctr * 100, 1)}% vs category benchmark {round(avg_ctr * 100, 1)}%."
 
             body = (
-                f"Hi {merchant_name}, I noticed your {metric} has dropped by {delta}% over the last 7 days. "
-                f"One opportunity I noticed is {suggestion}. "
-                f"Would you like me to prepare a personalised recommendation to help recover your {metric}?"
-            )
+                f"Great news {merchant_name}, your {metric} improved{delta_text} recently."
+                f"{peer_text} This is a good moment to push '{active_offer}' while interest is warm. "
+                f"Want me to draft a WhatsApp campaign for this?"
+            )       
 
         elif kind == "recall_due":
             body = f"Hi {merchant_name}, one of your customers is due for a follow-up. Shall I prepare a reminder?"
 
         elif kind == "festival_upcoming":
-            body = f"Hi {merchant_name}, an upcoming festival is a good opportunity to promote your business. Want campaign ideas?"
+
+            payload = trigger.get("payload", {})
+            festival = payload.get("festival", "an upcoming festival")
+            days_until = payload.get("days_until")
+            category_relevance = payload.get("category_relevance", [])
+
+            relevance_text = ""
+            if category_relevance:
+                relevance_text = f" This is especially relevant for {', '.join(category_relevance)}."
+
+            days_text = f" in {days_until} days" if days_until else ""
+
+            body = (
+                f"Hi {merchant_name}, {festival} is coming up{days_text}."
+                f"{relevance_text} This could be a good time to run a category-specific campaign around '{offer_title}'. "
+                f"Want me to draft one WhatsApp campaign you can review?"
+            )
 
         else:
 
