@@ -162,7 +162,30 @@ def tick(data: dict):
             offer_title = offers[0].get("title", "your current offer")
 
         if kind == "research_digest":
-            body = f"Hi {merchant_name}, there's new research relevant to your business. Would you like a quick summary?"
+
+            signals = merchant.get("signals", [])
+            peer = "your business"
+
+            if category == "dentists":
+                peer = "your patients"
+            elif category == "gyms":
+                peer = "your members"
+            elif category == "restaurants":
+                peer = "your customers"
+            elif category == "salons":
+                peer = "your clients"
+            elif category == "pharmacies":
+                peer = "your regular customers"
+
+            signal_text = ""
+
+            if signals:
+                signal_text = f" I also noticed {signals[0].replace('_', ' ')}."
+
+            body = (
+                f"Hi {merchant_name}, I found a new {category} industry update that could be relevant for {peer}."
+                f"{signal_text} Would you like a quick summary and a suggestion on how you could use it for your business?"
+            )
 
         elif kind == "perf_spike":
             body = f"Great news {merchant_name}! Your business performance has improved recently. Would you like to see what's driving it?"

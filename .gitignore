@@ -4,3 +4,5 @@ venv/
 .venv/
 .env
 .DS_Store
+dataset/
+expanded/
