@@ -129,7 +129,163 @@ def reply(data: dict):
         "cta": "open_ended",
         "rationale": "Continuing the conversation."
     }
+def compose_context_message(trigger, merchant, customer, category_context):
+    kind = trigger.get("kind", "update")
+    payload = trigger.get("payload", {})
 
+    identity = merchant.get("identity", {})
+    merchant_name = identity.get("name", "there")
+    category = merchant.get("category_slug", "")
+
+    performance = merchant.get("performance", {})
+    offers = merchant.get("offers", [])
+    signals = merchant.get("signals", [])
+    customer_aggregate = merchant.get("customer_aggregate", {})
+
+    peer_stats = category_context.get("peer_stats", {})
+    digest = category_context.get("digest", [])
+    offer_catalog = category_context.get("offer_catalog", [])
+    seasonal_beats = category_context.get("seasonal_beats", [])
+    trend_signals = category_context.get("trend_signals", [])
+
+    offer_title = "a relevant offer"
+    if offers:
+        offer_title = offers[0].get("title", offer_title)
+    elif offer_catalog:
+        offer_title = offer_catalog[0].get("title", offer_title)
+
+    signal_text = ""
+    if signals:
+        signal_text = signals[0].replace("_", " ")
+
+    peer_text = ""
+    ctr = performance.get("ctr")
+    avg_ctr = peer_stats.get("avg_ctr")
+    if ctr and avg_ctr:
+        peer_text = f" Your CTR is {round(ctr * 100, 1)}% vs category benchmark {round(avg_ctr * 100, 1)}%."
+
+    if kind == "research_digest":
+        top_item_id = payload.get("top_item_id")
+        item = None
+
+        for d in digest:
+            if d.get("id") == top_item_id:
+                item = d
+                break
+
+        if not item and digest:
+            item = digest[0]
+
+        title = item.get("title", "a new category update") if item else "a new category update"
+        source = item.get("source", "") if item else ""
+        source_text = f" — {source}" if source else ""
+
+        relevance = "your business"
+        if category == "dentists" and customer_aggregate.get("high_risk_adult_count"):
+            relevance = f"your {customer_aggregate.get('high_risk_adult_count')} high-risk adult patients"
+        elif category == "gyms":
+            relevance = "your members"
+        elif category == "restaurants":
+            relevance = "your customers"
+        elif category == "salons":
+            relevance = "your clients"
+        elif category == "pharmacies":
+            relevance = "your repeat customers"
+
+        return (
+            f"Hi {merchant_name}, I found this update relevant for {relevance}: "
+            f"{title}{source_text}. Want me to summarize it and draft a WhatsApp message you can use?"
+        )
+
+    if kind == "perf_dip":
+        metric = payload.get("metric", "performance")
+        delta = abs(int(payload.get("delta_pct", 0) * 100))
+
+        suggestion = f"promoting '{offer_title}'"
+        if "no_active_offers" in signals:
+            suggestion = "creating a new customer offer"
+        elif "no_recent_post" in signals or any("stale_posts" in s for s in signals):
+            suggestion = "posting fresh updates"
+        elif signal_text:
+            suggestion = f"acting on the signal: {signal_text}"
+
+        return (
+            f"Hi {merchant_name}, your {metric} dropped by {delta}% over the last 7 days."
+            f"{peer_text} One practical recovery step is {suggestion}. "
+            f"Want me to prepare a specific recommendation?"
+        )
+
+    if kind == "perf_spike":
+        metric = payload.get("metric", "performance")
+        delta = abs(int(payload.get("delta_pct", 0) * 100)) if payload.get("delta_pct") else None
+        delta_text = f" by {delta}%" if delta else ""
+
+        return (
+            f"Great news {merchant_name}, your {metric} improved{delta_text} recently."
+            f"{peer_text} This is a good moment to push '{offer_title}' while interest is warm. "
+            f"Want me to draft one campaign?"
+        )
+
+    if kind == "recall_due":
+        customer_identity = customer.get("identity", {}) if customer else {}
+        customer_name = customer_identity.get("name", "there")
+        language_pref = customer_identity.get("language_pref", "")
+
+        service_due = payload.get("service_due", "follow-up").replace("_", " ")
+        slots = payload.get("available_slots", [])
+        slot_text = ""
+
+        if slots:
+            labels = [s.get("label") for s in slots if s.get("label")]
+            if labels:
+                slot_text = " Available slots: " + " or ".join(labels[:2]) + "."
+
+        if "hi-en" in language_pref:
+            return (
+                f"Hi {customer_name}, {merchant_name} se reminder hai — your {service_due} is due."
+                f" {offer_title} available hai.{slot_text} Reply YES to book, or suggest another time."
+            )
+
+        return (
+            f"Hi {customer_name}, this is a reminder from {merchant_name} — your {service_due} is due."
+            f" {offer_title} is available.{slot_text} Reply YES to book, or suggest another time."
+        )
+
+    if kind == "festival_upcoming":
+        festival = payload.get("festival", "an upcoming festival")
+        days_until = payload.get("days_until")
+        days_text = f" in {days_until} days" if days_until else ""
+
+        return (
+            f"Hi {merchant_name}, {festival} is coming up{days_text}. "
+            f"This is a good window to promote '{offer_title}' with a category-specific WhatsApp campaign. "
+            f"Want me to draft one?"
+        )
+
+    if seasonal_beats:
+        seasonal_note = seasonal_beats[0].get("note", "")
+        return (
+            f"Hi {merchant_name}, quick observation for {category}: {seasonal_note}. "
+            f"Based on your current context, '{offer_title}' could be a useful angle. Want me to draft a message?"
+        )
+
+    if trend_signals:
+        trend = trend_signals[0]
+        query = trend.get("query", "customer demand")
+        delta_yoy = trend.get("delta_yoy")
+        trend_text = f"{query}"
+        if delta_yoy:
+            trend_text += f" is up {round(delta_yoy * 100)}% YoY"
+
+        return (
+            f"Hi {merchant_name}, I noticed a category trend: {trend_text}. "
+            f"This could be useful for your next WhatsApp campaign. Want me to draft one?"
+        )
+
+    return (
+        f"Hi {merchant_name}, I noticed a {kind} update for your business. "
+        f"Want me to suggest the next best action?"
+    )
 @app.post("/v1/tick")
 def tick(data: dict):
 
@@ -147,163 +303,35 @@ def tick(data: dict):
         kind = trigger.get("kind", "update")
 
         merchant = merchant_contexts.get(merchant_id, {})
+        customer = customer_contexts.get(customer_id, {})
+
+        if not merchant:
+            continue
+
         identity = merchant.get("identity", {})
         merchant_name = identity.get("name", "there")
         category = merchant.get("category_slug", "")
         category_context = category_contexts.get(category, {})
-        city = identity.get("city", "")
-        locality = identity.get("locality", "")
 
-        performance = merchant.get("performance", {})
-        offers = merchant.get("offers", [])
-
-        offer_title = "your current offer"
-
-        if offers:
-            offer_title = offers[0].get("title", "your current offer")
-
-        if kind == "research_digest":
-
-            payload = trigger.get("payload", {})
-            digest_items = category_context.get("digest", [])
-            top_item_id = payload.get("top_item_id")
-
-            digest_item = None
-
-            for item in digest_items:
-                if item.get("id") == top_item_id:
-                    digest_item = item
-                    break
-
-            if not digest_item and digest_items:
-                digest_item = digest_items[0]
-
-            title = digest_item.get("title", "a new industry update") if digest_item else "a new industry update"
-            source = digest_item.get("source", "") if digest_item else ""
-
-            customer_aggregate = merchant.get("customer_aggregate", {})
-            high_risk_count = customer_aggregate.get("high_risk_adult_count")
-
-            relevance = "your business"
-            if category == "dentists" and high_risk_count:
-                relevance = f"your {high_risk_count} high-risk adult patients"
-            elif category == "gyms":
-                relevance = "your members"
-            elif category == "restaurants":
-                relevance = "your customers"
-            elif category == "salons":
-                relevance = "your clients"
-            elif category == "pharmacies":
-                relevance = "your repeat customers"
-
-            source_text = f" — {source}" if source else ""
-
-            body = (
-                f"Hi {merchant_name}, I found this update relevant for {relevance}: "
-                f"{title}{source_text}. "
-                f"Would you like me to summarize it and draft a WhatsApp message you can use?"
-            )
-
-        elif kind == "perf_spike":
-
-            payload = trigger.get("payload", {})
-            metric = payload.get("metric", "performance")
-            delta = abs(int(payload.get("delta_pct", 0) * 100)) if payload.get("delta_pct") else None
-
-            peer_stats = category_context.get("peer_stats", {})
-            avg_ctr = peer_stats.get("avg_ctr")
-            ctr = performance.get("ctr")
-
-            active_offer = offer_title
-            if not offers:
-                catalog = category_context.get("offer_catalog", [])
-                if catalog:
-                    active_offer = catalog[0].get("title", "a category-relevant offer")
-
-            delta_text = f" by {delta}%" if delta else ""
-            peer_text = ""
-
-            if ctr and avg_ctr:
-                peer_text = f" Your CTR is {round(ctr * 100, 1)}% vs category benchmark {round(avg_ctr * 100, 1)}%."
-
-            body = (
-                f"Great news {merchant_name}, your {metric} improved{delta_text} recently."
-                f"{peer_text} This is a good moment to push '{active_offer}' while interest is warm. "
-                f"Want me to draft a WhatsApp campaign for this?"
-            )       
-
-        elif kind == "recall_due":
-            body = f"Hi {merchant_name}, one of your customers is due for a follow-up. Shall I prepare a reminder?"
-
-        elif kind == "festival_upcoming":
-
-            payload = trigger.get("payload", {})
-            festival = payload.get("festival", "an upcoming festival")
-            days_until = payload.get("days_until")
-            category_relevance = payload.get("category_relevance", [])
-
-            relevance_text = ""
-            if category_relevance:
-                relevance_text = f" This is especially relevant for {', '.join(category_relevance)}."
-
-            days_text = f" in {days_until} days" if days_until else ""
-
-            body = (
-                f"Hi {merchant_name}, {festival} is coming up{days_text}."
-                f"{relevance_text} This could be a good time to run a category-specific campaign around '{offer_title}'. "
-                f"Want me to draft one WhatsApp campaign you can review?"
-            )
-
-        else:
-
-            if category == "dentists":
-                body = (
-                    f"Hi Dr. {merchant_name}, I found an update that may help improve patient engagement. "
-                    "Would you like me to suggest a patient communication?"
-                )
-
-            elif category == "gyms":
-                body = (
-                    f"Hi {merchant_name}, I noticed an opportunity to attract more gym members. "
-                    "Would you like some campaign ideas?"
-                )
-
-            elif category == "restaurants":
-                body = (
-                    f"Hi {merchant_name}, I found a marketing opportunity that could increase customer visits. "
-                    "Would you like to see it?"
-                )
-
-            elif category == "salons":
-                body = (
-                    f"Hi {merchant_name}, I have a few ideas that could help bring more salon appointments this week. "
-                    "Interested?"
-                )
-
-            elif category == "pharmacies":
-                body = (
-                    f"Hi {merchant_name}, I noticed an opportunity to improve customer engagement for your pharmacy. "
-                    "Would you like some suggestions?"
-                )
-
-            else:
-                body = (
-                    f"Hi {merchant_name}, I noticed a {kind} update for your business. "
-                    "Would you like me to help with the next step?"
-                )
+        body = compose_context_message(
+            trigger,
+            merchant,
+            customer,
+            category_context
+        )
 
         actions.append({
             "conversation_id": f"conv_{merchant_id}_{trigger_id}",
             "merchant_id": merchant_id,
             "customer_id": customer_id,
-            "send_as": "vera",
+            "send_as": "merchant_on_behalf" if customer_id else "vera",
             "trigger_id": trigger_id,
-            "template_name": "vera_basic_update_v1",
+            "template_name": f"vera_{kind}_v2",
             "template_params": [merchant_name, kind],
             "body": body,
             "cta": "open_ended",
             "suppression_key": trigger.get("suppression_key", trigger_id),
-            "rationale": f"Generated from trigger kind {kind} for merchant {merchant_id}"
+            "rationale": f"Composed using trigger, merchant, customer, and category context for {kind}"
         })
 
     return {
