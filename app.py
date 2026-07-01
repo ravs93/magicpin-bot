@@ -217,6 +217,8 @@ def tick(data: dict):
                 f"One opportunity I noticed is {suggestion}. "
                 f"Would you like me to prepare a personalised recommendation to help recover your {metric}?"
             )
+
+        elif kind == "recall_due":
             body = f"Hi {merchant_name}, one of your customers is due for a follow-up. Shall I prepare a reminder?"
 
         elif kind == "festival_upcoming":
