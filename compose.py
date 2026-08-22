@@ -1,12 +1,12 @@
 """
-LLM-powered composer for Vera.
+LLM-powered composer for Vera -- using Google's Gemini API (free tier).
 """
 import os
 import json
-import anthropic
+import google.generativeai as genai
 
-MODEL = os.environ.get("LLM_MODEL", "claude-sonnet-4-5-20250929")
-_client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+MODEL = os.environ.get("LLM_MODEL", "gemini-2.5-flash")
+genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
 
 SYSTEM_PROMPT = """You are Vera, magicpin's AI assistant for local merchant growth \
 (dentists, salons, restaurants, gyms, pharmacies). Given structured JSON context \
@@ -43,6 +43,8 @@ Respond with ONLY a JSON object, no other text, in exactly this shape:
 }
 """
 
+_compose_model = genai.GenerativeModel(MODEL, system_instruction=SYSTEM_PROMPT)
+
 
 def _fallback_compose(trigger, merchant, customer, category_context):
     identity = merchant.get("identity", {}) or {}
@@ -59,19 +61,12 @@ def _fallback_compose(trigger, merchant, customer, category_context):
 def compose_message(trigger, merchant, customer, category_context):
     user_payload = {"trigger": trigger, "merchant": merchant, "customer": customer, "category_context": category_context}
     try:
-        resp = _client.messages.create(
-            model=MODEL,
-            max_tokens=400,
-            system=SYSTEM_PROMPT,
-            timeout=20.0,
-            messages=[{"role": "user", "content": "Compose the next Vera message from this context:\n\n" + json.dumps(user_payload, ensure_ascii=False)}],
+        resp = _compose_model.generate_content(
+            "Compose the next Vera message from this context:\n\n" + json.dumps(user_payload, ensure_ascii=False),
+            generation_config={"response_mime_type": "application/json"},
+            request_options={"timeout": 20},
         )
-        text = resp.content[0].text.strip()
-        if text.startswith("```"):
-            text = text.strip("`")
-            if text.lower().startswith("json"):
-                text = text[4:]
-        parsed = json.loads(text)
+        parsed = json.loads(resp.text)
         assert "body" in parsed and parsed["body"]
         return parsed
     except Exception as e:
@@ -94,22 +89,17 @@ Respond with ONLY a JSON object:
 {"action": "send|wait|end", "body": "<message if action is send, else empty string>", "rationale": "<one sentence>"}
 """
 
+_reply_model = genai.GenerativeModel(MODEL, system_instruction=REPLY_SYSTEM_PROMPT)
+
 
 def compose_reply(history, latest_message, origin_context):
     try:
-        resp = _client.messages.create(
-            model=MODEL,
-            max_tokens=300,
-            system=REPLY_SYSTEM_PROMPT,
-            timeout=20.0,
-            messages=[{"role": "user", "content": json.dumps({"conversation_history": history, "latest_message": latest_message, "origin_context": origin_context}, ensure_ascii=False)}],
+        resp = _reply_model.generate_content(
+            json.dumps({"conversation_history": history, "latest_message": latest_message, "origin_context": origin_context}, ensure_ascii=False),
+            generation_config={"response_mime_type": "application/json"},
+            request_options={"timeout": 20},
         )
-        text = resp.content[0].text.strip()
-        if text.startswith("```"):
-            text = text.strip("`")
-            if text.lower().startswith("json"):
-                text = text[4:]
-        parsed = json.loads(text)
+        parsed = json.loads(resp.text)
         assert "action" in parsed
         return parsed
     except Exception as e:
